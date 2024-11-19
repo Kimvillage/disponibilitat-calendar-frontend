@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const DAYS_OF_WEEK = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'];
 const MONTHS = ['Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny', 'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre'];
@@ -11,40 +11,40 @@ interface DayData {
   status: Status;
 }
 
-interface CalendarData {
-  [key: string]: DayData;
-}
+const API_URL = 'https://quimvila.com/calendari/api';
 
 export default function Calendar() {
-  const [calendar, setCalendar] = useState<CalendarData>({});
+  const [calendar, setCalendar] = useState<Record<string, DayData>>({});
   const [currentDate, setCurrentDate] = useState(new Date());
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-  useEffect(() => {
-    fetchCalendarData();
-  }, []);
-
+  // Carregar dades
   const fetchCalendarData = async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/api/calendar`);
-      if (!response.ok) throw new Error('Error carregant les dades');
+      const response = await fetch(`${API_URL}/calendar`);
+      if (!response.ok) throw new Error('Error carregant dades');
       const data = await response.json();
       setCalendar(data);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
-      console.error('Error:', err);
       setError('Error carregant les dades');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Carregar dades inicialment
+  useEffect(() => {
+    fetchCalendarData();
+    const interval = setInterval(fetchCalendarData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Canviar estat d'un dia
   const handleDayClick = async (date: Date) => {
     const formattedDate = date.toISOString().split('T')[0];
     const currentStatus = calendar[formattedDate]?.status || 'none';
@@ -58,7 +58,7 @@ export default function Calendar() {
     };
 
     try {
-      const response = await fetch(`${API_URL}/api/calendar`, {
+      const response = await fetch(`${API_URL}/calendar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCalendar)
@@ -70,11 +70,13 @@ export default function Calendar() {
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
-      console.error('Error:', err);
       setError('Error desant els canvis');
+      console.error(err);
+      await fetchCalendarData();
     }
   };
 
+  // Obtenir color segons estat
   const getDayColor = (dayData?: DayData) => {
     switch(dayData?.status) {
       case 'morning':
@@ -90,6 +92,7 @@ export default function Calendar() {
     }
   };
 
+  // Obtenir dies del mes
   const getDays = () => {
     const days = [];
     const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -113,7 +116,16 @@ export default function Calendar() {
 
   if (loading) {
     return (
-      <div className="text-center">Carregant calendari...</div>
+      <div className="max-w-3xl mx-auto p-4">
+        <div className="space-y-4">
+          <div className="h-8 w-64 mx-auto bg-gray-200 animate-pulse rounded"></div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array(35).fill(0).map((_, i) => (
+              <div key={i} className="h-12 w-full bg-gray-200 animate-pulse rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -121,6 +133,9 @@ export default function Calendar() {
     <div className="max-w-3xl mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex flex-col items-center mb-6">
+          <h1 className="text-lg text-gray-600 mb-2">
+            Calendari de Disponibilitat
+          </h1>
           <h2 className="text-3xl font-bold text-gray-800">
             {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
